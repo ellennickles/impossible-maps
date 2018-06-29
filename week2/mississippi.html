@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    #fly {
+      display: block;
+      position: relative;
+      margin: 700px auto;
+      width: 10%;
+      height: 40px;
+      padding: 10px;
+      border: none;
+      border-radius: 3px;
+      font-size: 12px;
+      text-align: center;
+      font-family: 'Open Sans', sans-serif;
+      color: #000000;
+      background: #ffffff;
+    }
+
+    .marker {
+      background-image: url('triangle-15.svg');
+      background-size: cover;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .mapboxgl-popup {
+      max-width: 200px;
+    }
+
+    .mapboxgl-popup-content {
+      text-align: center;
+      font-family: 'Open Sans', sans-serif;
+    }
+</style>
+
+<title> Up the Mighty Mississippi </title>
+<script src='https://api.mapbox.com/mapbox-gl-js/v0.44.1/mapbox-gl.js'></script>
+<link href='https://api.mapbox.com/mapbox-gl-js/v0.44.1/mapbox-gl.css' rel='stylesheet' />
+</head>
+
+<body>
+  <div id="map"> </div>
+
+  <button id='fly' onclick="style.display = 'none'">Fly to Mouth of River</button>
+
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZW5pY2tsZXMiLCJhIjoiY2pmNnRqb2RxMmo5YTJ3b2hndHBmbjl5MCJ9.QdchwNixM-8WhHOMme4qVQ';
+
+    var startfly = [-94.880278, 35.473611];
+    var endfly = [-89.40811157226562, 28.946870564861495];
+
+    var map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/satellite-v9',
+      center: startfly,
+      zoom: 4,
+      maxZoom: 18,
+      pitch: 50,
+    });
+
+    // from: https://www.mapbox.com/help/custom-markers-gl-js/
+    var geojson = {
+      type: 'FeatureCollection',
+      features: [{
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-89.4315, 28.9215]
+          },
+          properties: {
+            title: 'Gulf of Mexico',
+            description: 'Mouth of the Mississippi River<br>Plaquemines County, Louisiana'
+          }
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-95.18194198608398, 47.21152273634174]
+          },
+          properties: {
+            title: 'Lake Itasca',
+            description: 'Source of the Mississippi River<br>Clearwater County, Minnesota'
+          }
+        }
+      ]
+    };
+
+    geojson.features.forEach(function(marker) {
+      // create a HTML element for each feature
+      var el = document.createElement('div');
+      el.className = 'marker';
+
+      // make a marker for each feature and add to the map
+      new mapboxgl.Marker(el)
+      .setLngLat(marker.geometry.coordinates)
+      .setPopup(new mapboxgl.Popup({ offset: 25 }) // add popups
+      .setHTML('<h3>' + marker.properties.title + '</h3><p>' + marker.properties.description + '</p>'))
+      .addTo(map);
+    });
+
+    map.on('load', function() {
+      map.addSource('mississippi', {
+        'type': 'geojson',
+        'data': 'data/data.geojson'
+      });
+      // from: https://www.mapbox.com/mapbox-gl-js/example/center-on-symbol/
+      // symbols: https://github.com/mapbox/mapbox-gl-styles/tree/master/sprites/satellite-v9/_svg
+      map.addLayer({
+        "id": "symbols",
+        "type": "symbol",
+        'source': 'mississippi',
+        "layout": {
+          "icon-image": "circle-stroked-15"
+        }
+      });
+
+      map.on('click', 'symbols', function(e) {
+        map.flyTo({
+          center: e.features[0].geometry.coordinates
+        });
+      });
+
+      map.on('mouseenter', 'symbols', function() {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'symbols', function() {
+        map.getCanvas().style.cursor = '';
+      });
+
+      map.on('mousemove', function(e) {
+        document.getElementById('info').innerHTML =
+          JSON.stringify(e.point) + '<br />' +
+          JSON.stringify(e.lngLat);
+      });
+
+    });
+
+    map.addControl(new mapboxgl.FullscreenControl());
+
+    console.log("testing");
+
+    // from: https://www.mapbox.com/mapbox-gl-js/example/flyto/
+    document.getElementById('fly').addEventListener('click', function() {
+      map.flyTo({
+        center: endfly,
+        zoom: 12,
+        bearing: 0,
+        speed: 0.7,
+        curve: 1,
+        easing: function(t) {
+          return t;
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>

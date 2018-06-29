@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    #fly {
+      display: block;
+      position: relative;
+      margin: 700px auto;
+      width: 10%;
+      height: 40px;
+      padding: 10px;
+      border: none;
+      border-radius: 3px;
+      font-size: 12px;
+      text-align: center;
+      font-family: 'Open Sans', sans-serif;
+      color: #000000;
+      background: #ffffff;
+    }
+
+    .marker {
+      background-image: url('star-15.svg');
+      background-size: cover;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .mapboxgl-popup {
+      max-width: 200px;
+    }
+
+    .mapboxgl-popup-content {
+      text-align: center;
+      font-family: 'Open Sans', sans-serif;
+    }
+  </style>
+
+  <title> Up the Mighty Mississippi </title>
+  <script src='https://api.mapbox.com/mapbox-gl-js/v0.44.1/mapbox-gl.js'></script>
+  <link href='https://api.mapbox.com/mapbox-gl-js/v0.44.1/mapbox-gl.css' rel='stylesheet' />
+</head>
+
+<body>
+  <div id='map'> </div>
+
+  <button id='fly' onclick='style.display = "none"'>Fly to Mouth of River</button>
+
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZW5pY2tsZXMiLCJhIjoiY2pmNnRqb2RxMmo5YTJ3b2hndHBmbjl5MCJ9.QdchwNixM-8WhHOMme4qVQ';
+
+    var startfly = [-94.880278, 35.473611];
+    var endfly = [-89.40811157226562, 28.946870564861495];
+
+    var map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/satellite-v9',
+      center: startfly,
+      zoom: 4,
+      maxZoom: 18,
+      pitch: 50,
+    });
+
+    // fly button behavior
+    document.getElementById('fly').addEventListener('click', function() {
+      map.flyTo({
+        center: endfly,
+        zoom: 12,
+        bearing: 0,
+        speed: 0.7,
+        curve: 1,
+        easing: function(t) {
+          return t;
+        }
+      });
+    });
+
+    // add river data
+    map.on('load', function() {
+      map.addSource('mississippi', {
+        'type': 'geojson',
+        'data': 'data/data.geojson'
+      });
+
+      map.addLayer({
+        'id': 'symbols',
+        'type': 'symbol',
+        'source': 'mississippi',
+        'layout': {
+          'icon-image': 'circle-stroked-15',
+        }
+      });
+
+      // center map on river symbols
+      map.on('click', 'symbols', function(e) {
+        map.flyTo({
+          center: e.features[0].geometry.coordinates
+        });
+      });
+
+      map.on('mouseenter', 'symbols', function() {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'symbols', function() {
+        map.getCanvas().style.cursor = '';
+      });
+
+      // river mouth and headwaters place markers
+      var geojson = {
+        type: 'FeatureCollection',
+        features: [{
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [-89.4315, 28.9215]
+            },
+            properties: {
+              title: 'Gulf of Mexico',
+              description: 'Mouth of the Mississippi River<br>Plaquemines County, Louisiana'
+            }
+          },
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [-95.18194198608398, 47.21152273634174]
+            },
+            properties: {
+              title: 'Lake Itasca',
+              description: 'Source of the Mississippi River<br>Clearwater County, Minnesota'
+            }
+          }
+        ]
+      };
+
+      geojson.features.forEach(function(marker) {
+        var el = document.createElement('div');
+        el.className = 'marker';
+
+        new mapboxgl.Marker(el)
+          .setLngLat(marker.geometry.coordinates)
+          .setPopup(new mapboxgl.Popup({
+              offset: 25
+            })
+            .setHTML('<h3>' + marker.properties.title + '</h3><p>' + marker.properties.description + '</p>'))
+          .addTo(map);
+      });
+
+
+      map.addSource('start_end', {
+        'type': 'geojson',
+        'data': 'data/start_end.geojson',
+      });
+
+      map.addLayer({
+        'id': 'start_end',
+        'type': 'symbol',
+        'source': 'start_end',
+        'layout': {
+          'icon-image': 'circle-stroked-15',
+        }
+      });
+
+
+      // add superfund sites data
+      map.addSource('superfund', {
+        'type': 'geojson',
+        'data': 'data/superfund2014.geojson'
+      });
+
+      map.addLayer({
+        'id': 'superfund',
+        'type': 'circle',
+        'source': 'superfund',
+        'minzoom': 8,
+        'paint': {
+          'circle-opacity': 0.7,
+          'circle-radius': {
+               'base': 6,
+               'stops': [[4, 6], [8, 9]]
+           },
+          // from: https://github.com/mapbox/mapbox-gl-js/issues/5182
+          'circle-color': {
+            'property': 'NPL_STATUS',
+            'type': 'categorical',
+            'stops': [
+              ['Deleted from the Final NPL', '#00ff00'],
+              ['Currently on the Final NPL', '#ffa500'],
+              ['Proposed for NPL', '#ff0000']
+            ]
+          }
+        }
+      });
+
+      // from: https://www.mapbox.com/mapbox-gl-js/example/popup-on-click/
+      map.on('click', 'superfund', function(e) {
+        var coordinates = e.features[0].geometry.coordinates.slice();
+        var site = e.features[0].properties.SITE_NAME;
+        var link = e.features[0].properties.SITE_PROFILE_URL;
+        var status = e.features[0].properties.NPL_STATUS;
+
+        var info = '<a href="' + link + '" target="_blank">' + site + '</a><br>' + status
+
+        new mapboxgl.Popup()
+          .setLngLat(coordinates)
+          .setHTML(info)
+          .addTo(map);
+      });
+
+      map.on('mouseenter', 'superfund', function() {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'superfund', function() {
+        map.getCanvas().style.cursor = '';
+      });
+
+    });
+
+    map.addControl(new mapboxgl.FullscreenControl());
+
+    console.log('testing');
+  </script>
+</body>
+
+</html>
